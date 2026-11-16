@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Validate the module build manifest using only the Python standard library."""
+"""Validate the module build manifest and supported build profiles."""
 import json
+import os
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 manifest_path = ROOT / "config/modules.json"
 platforms_path = ROOT / "config/platforms.json"
 
+
 def load(path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"ERROR: {path.relative_to(ROOT)}: {exc}")
+
 
 manifest = load(manifest_path)
 platforms = load(platforms_path)
@@ -40,11 +42,28 @@ for item in manifest["modules"]:
     if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
         raise SystemExit(f"ERROR: configure_args must be an array of strings: {module_id}")
 
+nginx_version = os.getenv("NGINX_VERSION", "1.28.0")
+matching_profiles = []
 for platform in platforms["platforms"]:
     for key in ("id", "os", "debian_release", "architecture", "build_flavor", "nginx_versions"):
         if key not in platform:
             raise SystemExit(f"ERROR: platform entry missing {key}: {platform!r}")
     if platform["architecture"] != "arm64":
         raise SystemExit(f"ERROR: unsupported architecture in current builder: {platform['architecture']}")
+    if (
+        platform["os"] == "debian"
+        and platform["debian_release"] == "13"
+        and platform["build_flavor"] == "nginx.org-upstream-source"
+        and nginx_version in platform["nginx_versions"]
+    ):
+        matching_profiles.append(platform)
 
-print(f"Validated {len(manifest['modules'])} module(s) and {len(platforms['platforms'])} platform profile(s).")
+if not matching_profiles:
+    raise SystemExit(
+        f"ERROR: no configured Debian 13 ARM64 upstream-source profile supports NGINX {nginx_version}"
+    )
+
+print(
+    f"Validated {len(manifest['modules'])} module(s); "
+    f"NGINX {nginx_version} matches {len(matching_profiles)} platform profile(s)."
+)
