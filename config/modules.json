@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "headers-more",
+      "name": "Headers More",
+      "description": "Set and clear HTTP request and response headers.",
+      "repository": "https://github.com/openresty/headers-more-nginx-module",
+      "ref": "v0.37",
+      "configure_args": []
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "NGINX Debian ARM64 Module Registry",
+  "description": "Dynamic NGINX modules for Debian ARM64",
+  "schema_version": 1,
+  "architecture": "arm64",
+  "os_family": [
+    "debian"
+  ],
+  "modules": []
+}

@@ -1,0 +1,78 @@
+name: Build Debian ARM64 NGINX Modules
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NGINX_VERSION: "1.28.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build in Debian ARM64
+        run: |
+          docker run --rm \
+            --platform linux/arm64 \
+            -e NGINX_VERSION="${NGINX_VERSION}" \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            debian:13-slim \
+            bash scripts/build-modules.sh
+
+      - name: Generate index
+        run: python3 scripts/generate-index.py
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+          NGINX_VERSION: ${{ env.NGINX_VERSION }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nginx-debian-arm64
+          path: |
+            dist/*
+            index.json
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+            index.json
+
+      - name: Checkout main branch
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: index-repo
+
+      - name: Update public index
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cp index.json index-repo/index.json
+
+          git -C index-repo config user.name "github-actions[bot]"
+          git -C index-repo config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git -C index-repo add index.json
+
+          git -C index-repo diff --cached --quiet || \
+            git -C index-repo commit -m "Update module index"
+
+          git -C index-repo push
