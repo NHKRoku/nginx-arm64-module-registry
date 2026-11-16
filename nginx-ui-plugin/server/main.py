@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import platform
 import re
 import shutil
@@ -180,6 +179,8 @@ def handle_http(params: dict[str, Any]) -> dict[str, Any]:
         return json_response(405, {"error": "Only GET is supported in this read-only release"})
 
     try:
+        if path not in ("/api/registry", "/api/nginx", "/api/compatibility"):
+            return json_response(404, {"error": "Not found"})
         registry = read_registry()
         local = local_platform()
         nginx = nginx_info()
@@ -187,22 +188,20 @@ def handle_http(params: dict[str, Any]) -> dict[str, Any]:
             return json_response(200, registry)
         if path == "/api/nginx":
             return json_response(200, {"platform": local, "nginx": nginx})
-        if path == "/api/compatibility":
-            return json_response(
-                200,
-                {
-                    "registry": {
-                        "name": registry.get("name"),
-                        "generated_at": registry.get("generated_at"),
-                        "schema_version": registry.get("schema_version"),
-                    },
-                    "platform": local,
-                    "nginx": nginx,
-                    "matches": compatibility(registry, local, nginx),
+        return json_response(
+            200,
+            {
+                "registry": {
+                    "name": registry.get("name"),
+                    "generated_at": registry.get("generated_at"),
+                    "schema_version": registry.get("schema_version"),
                 },
-            )
-        return json_response(404, {"error": "Not found"})
-    except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
+                "platform": local,
+                "nginx": nginx,
+                "matches": compatibility(registry, local, nginx),
+            },
+        )
+    except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         log(f"request failed: {exc}")
         return json_response(502, {"error": "Could not read or validate the module registry"})
 
@@ -222,11 +221,7 @@ def dispatch(message: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
 
     if method == "plugin.initialize":
         result = {"api_version": 1, "capabilities": ["http"]}
-    elif method in ("plugin.initialized", "plugin.configure"):
-        result = {}
-    elif method == "plugin.ping":
-        result = {}
-    elif method == "plugin.shutdown":
+    elif method in ("plugin.initialized", "plugin.configure", "plugin.ping", "plugin.shutdown"):
         result = {}
     elif method == "plugin.exit":
         return None, True
