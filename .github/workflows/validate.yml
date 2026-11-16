@@ -1,4 +1,4 @@
-name: Validate registry
+name: Validate registry and NGINX UI plugin
 
 on:
   pull_request:
@@ -23,5 +23,15 @@ jobs:
         run: python3 scripts/validate-config.py
       - name: Validate published module index
         run: python3 scripts/validate-index.py
-      - name: Compile Python tooling
-        run: python3 -m py_compile scripts/*.py
+      - name: Compile Python tooling and plugin
+        run: |
+          python3 -m py_compile scripts/*.py nginx-ui-plugin/server/main.py
+          python3 -m py_compile nginx-ui-plugin/tests/test_plugin.py
+      - name: Test NGINX UI plugin protocol and compatibility logic
+        working-directory: nginx-ui-plugin
+        run: python3 -m unittest discover -s tests -v
+      - name: Build Linux ARM64 plugin launcher
+        run: |
+          cd nginx-ui-plugin
+          sh build.sh
+          test -x dist/linux-arm64/nginx-module-manager
