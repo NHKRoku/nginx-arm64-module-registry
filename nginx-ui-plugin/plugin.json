@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nginxui/plugin-spec/main/schema/plugin.schema.json",
+  "id": "io.github.nhkroku.nginx-module-manager",
+  "name": "NGINX Module Manager",
+  "version": "0.1.0",
+  "description": "Browse the NHKRoku ARM64 module registry and inspect local NGINX compatibility.",
+  "api_version": 1,
+  "min_nginx_ui_version": "3.0.0",
+  "server": {
+    "executables": {
+      "linux-arm64": "dist/linux-arm64/nginx-module-manager"
+    },
+    "lifecycle": "resident"
+  },
+  "capabilities": ["http"],
+  "permissions": ["network"],
+  "http": {
+    "listen": "rpc"
+  },
+  "webapp": {
+    "pages": [
+      {
+        "path": "modules",
+        "file": "pages/modules.html",
+        "title": {
+          "en": "NGINX Modules"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+name: Validate registry and NGINX UI plugin
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Validate module build configuration
+        run: python3 scripts/validate-config.py
+      - name: Validate published module index
+        run: python3 scripts/validate-index.py
+      - name: Compile Python tooling and plugin
+        run: |
+          python3 -m py_compile scripts/*.py nginx-ui-plugin/server/main.py
+          python3 -m py_compile nginx-ui-plugin/tests/test_plugin.py
+      - name: Test NGINX UI plugin protocol and compatibility logic
+        working-directory: nginx-ui-plugin
+        run: python3 -m unittest discover -s tests -v
+      - name: Build Linux ARM64 plugin launcher
+        run: |
+          cd nginx-ui-plugin
+          sh build.sh
+          test -x dist/linux-arm64/nginx-module-manager

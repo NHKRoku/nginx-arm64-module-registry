@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NGINX Modules</title>
+  <style>
+    :root { color-scheme: light dark; font: 14px/1.5 system-ui, sans-serif; }
+    body { margin: 0; padding: 20px; color: var(--text, inherit); }
+    h1 { margin: 0 0 6px; font-size: 1.5rem; }
+    .muted { opacity: .72; }
+    .toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:18px 0; }
+    button { padding:8px 14px; border:1px solid var(--border-color, #888); border-radius:6px; cursor:pointer; }
+    .status { padding:10px 12px; border-radius:6px; background:var(--card-background, rgba(127,127,127,.12)); }
+    .warning { border-left:3px solid #d99b28; padding:10px 12px; margin:12px 0; background:rgba(217,155,40,.1); }
+    table { width:100%; border-collapse:collapse; margin-top:14px; }
+    th,td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--border-color, rgba(127,127,127,.3)); vertical-align:top; }
+    th { font-weight:600; }
+    code { overflow-wrap:anywhere; }
+    .ok { color:#299764; font-weight:600; }
+    .bad { color:#c47b26; font-weight:600; }
+    @media(max-width:650px) { table { display:block; overflow-x:auto; } }
+  </style>
+</head>
+<body>
+  <h1>NGINX Dynamic Modules</h1>
+  <div class="muted">Read-only view of the NHKRoku Debian ARM64 module registry and this host's NGINX build.</div>
+  <div class="toolbar">
+    <button id="refresh" type="button">Refresh</button>
+    <span id="updated" class="muted"></span>
+  </div>
+  <div id="status" class="status">Waiting for NGINX UI authentication…</div>
+  <div id="host"></div>
+  <div id="results"></div>
+  <div class="warning">
+    Compatibility is a preliminary metadata check, not an ABI guarantee. This version cannot install modules,
+    modify NGINX configuration, or reload NGINX. Always review the module and test with <code>nginx -t</code>.
+  </div>
+<script>
+(() => {
+  'use strict';
+  const pluginId = 'io.github.nhkroku.nginx-module-manager';
+  let token = '';
+  const status = document.getElementById('status');
+  const host = document.getElementById('host');
+  const results = document.getElementById('results');
+  const updated = document.getElementById('updated');
+
+  parent.postMessage({ type: 'nginx-ui:token' }, location.origin);
+  parent.postMessage({ type: 'nginx-ui:theme' }, location.origin);
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || !event.data) return;
+    if (event.data.type === 'nginx-ui:token' && typeof event.data.token === 'string') {
+      token = event.data.token;
+      load();
+    }
+    if (event.data.type === 'nginx-ui:theme') document.documentElement.dataset.theme = event.data.theme;
+  });
+
+  async function api(path) {
+    const response = await fetch('/api/plugins/' + pluginId + '/http' + path, {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
+    });
+    if (!response.ok) throw new Error('Plugin API returned HTTP ' + response.status);
+    return response.json();
+  }
+
+  function cell(value) {
+    const td = document.createElement('td');
+    td.textContent = value == null || value === '' ? '—' : String(value);
+    return td;
+  }
+
+  async function load() {
+    if (!token) return;
+    status.textContent = 'Loading registry and checking this host…';
+    results.replaceChildren();
+    try {
+      const data = await api('/api/compatibility');
+      const p = data.platform;
+      const n = data.nginx;
+      host.textContent = 'Host: ' + p.pretty_name + ' · ' + p.machine +
+        ' · NGINX ' + (n.version || 'not detected');
+      updated.textContent = 'Registry generated: ' + (data.registry.generated_at || 'unknown');
+      const table = document.createElement('table');
+      const thead = document.createElement('tr');
+      ['Module', 'Module version', 'Target', 'Compatibility'].forEach(x => {
+        const th = document.createElement('th'); th.textContent = x; thead.append(th);
+      });
+      const head = document.createElement('thead'); head.append(thead); table.append(head);
+      const body = document.createElement('tbody');
+      for (const item of data.matches || []) {
+        const b = item.binary;
+        const tr = document.createElement('tr');
+        tr.append(cell(item.module_name + ' (' + item.module_id + ')'));
+        tr.append(cell(item.module_version));
+        tr.append(cell('Debian ' + b.debian_release + ' ARM64 · NGINX ' + b.nginx_version));
+        const result = document.createElement('td');
+        const passed = Object.values(item.checks).every(Boolean);
+        result.className = passed ? 'ok' : 'bad';
+        result.textContent = passed ? 'Metadata match' :
+          Object.entries(item.checks).filter(([,v]) => !v).map(([k]) => k.replaceAll('_',' ')).join(', ') + ' mismatch';
+        tr.append(result); body.append(tr);
+      }
+      table.append(body); results.append(table);
+      status.textContent = (data.matches || []).length
+        ? 'Registry loaded. ' + data.matches.length + ' binary target(s) checked.'
+        : 'Registry loaded; no binary targets are currently published.';
+    } catch (error) {
+      status.textContent = 'Unable to load module registry: ' + error.message;
+    }
+  }
+  document.getElementById('refresh').addEventListener('click', load);
+})();
+</script>
+</body>
+</html>

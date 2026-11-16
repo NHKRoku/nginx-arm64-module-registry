@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nginxui/plugin-spec/schema/catalog.schema.json",
+  "title": "NGINX UI plugin catalog",
+  "description": "The static catalog document a host fetches from a marketplace source, schema_version 1, including per-platform downloads and the publisher members. Packages carry their own signature, so a release names none; signature_url and signed_by of older catalogs are ignored. See https://nginxui.com/plugin/catalog. The reference host reads it in internal/plugin/marketplace.go. Unknown members are ignored by a host, so the schema allows them.",
+  "type": "object",
+  "required": ["schema_version", "plugins"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "The only catalog layout defined so far. Adding downloads did not change it: a host that does not know downloads still reads download_url."
+    },
+    "name": {
+      "$ref": "#/$defs/localized",
+      "description": "The name of the catalog a host shows for this source, locale code to text, en is the fallback."
+    },
+    "icon": {
+      "$ref": "#/$defs/url",
+      "description": "A square image that stands for the catalog, loaded under the same rules as screenshots."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "delisted": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/delisted" },
+      "description": "Plugins the catalog listed and took down. A host tells the users of an installed copy, and warns about it when its version or the key that signed it is among the withdrawn ones. An id that a source still lists is not delisted."
+    }
+  },
+  "$defs": {
+    "delisted": {
+      "type": "object",
+      "required": ["id", "delisted_at"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "$ref": "#/$defs/pluginId" },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Why the plugin was taken down, as the maintainers wrote it."
+        },
+        "delisted_at": { "type": "string", "format": "date" },
+        "yanked": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Versions the entry had withdrawn when it was taken down."
+        },
+        "revoked_signers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keyId" },
+          "description": "Signing keys the entry had revoked when it was taken down."
+        }
+      }
+    },
+    "pluginId": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$",
+      "description": "Plugin id, see https://nginxui.com/plugin/naming."
+    },
+    "platformKey": {
+      "type": "string",
+      "pattern": "^([a-z0-9]+-[a-z0-9]+|any)$",
+      "description": "<goos>-<goarch> as Go spells them, or any."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[0-9A-F]{16}$",
+      "description": "A minisign key id in upper case hex."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "localized": {
+      "type": "object",
+      "description": "Locale code to text, en is the fallback.",
+      "additionalProperties": { "type": "string" }
+    },
+    "screenshot": {
+      "type": "object",
+      "required": ["url"],
+      "additionalProperties": true,
+      "properties": {
+        "url": { "$ref": "#/$defs/url" },
+        "dark_url": {
+          "$ref": "#/$defs/url",
+          "description": "The same view in the dark theme; hosts show url when it is absent."
+        },
+        "caption": { "$ref": "#/$defs/localized" },
+        "crop": {
+          "$ref": "#/$defs/crop",
+          "description": "The part of url that lists and slideshows show. Hosts show the whole image when a user opens it. Without it hosts fill a 16:10 frame from the middle of the image."
+        },
+        "dark_crop": {
+          "$ref": "#/$defs/crop",
+          "description": "The part of dark_url to show, as crop is for url. Without it hosts use crop, since the dark image is the size of the light one."
+        }
+      }
+    },
+    "crop": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false,
+      "description": "A region of an image as shares of its width and height, from its top left corner, so it stays right when the image is scaled. The region is 16:10 on the image.",
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "releases"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "$ref": "#/$defs/pluginId" },
+        "name": { "$ref": "#/$defs/localized" },
+        "description": { "$ref": "#/$defs/localized" },
+        "author": { "type": "string" },
+        "author_public_key": {
+          "type": "string",
+          "description": "Minisign public key (the base64 line of a .pub file) the author signs the packages of this entry with. A package downloaded from this entry and signed with it is community."
+        },
+        "homepage_url": { "$ref": "#/$defs/url" },
+        "repository_url": { "$ref": "#/$defs/url" },
+        "readme_url": { "$ref": "#/$defs/url" },
+        "icon_url": { "$ref": "#/$defs/url" },
+        "screenshots": {
+          "type": "array",
+          "maxItems": 8,
+          "description": "Images of the plugin in use, in display order.",
+          "items": { "$ref": "#/$defs/screenshot" }
+        },
+        "permission_reasons": {
+          "type": "object",
+          "description": "Translations of the notes that explain each permission, keyed by permission and then by host locale code. They come from the store document of the plugin and win over the translations in the manifest of a release; English stays in that manifest. Optional: a host that does not read it shows the manifest's.",
+          "additionalProperties": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 300 } }
+        },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lowercase category ids for filtering, such as certificates or logs. A host translates the ids it knows and shows any other id as it is, so a catalog may add categories."
+        },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "license": { "type": "string" },
+        "trust": {
+          "enum": ["official", "verified", "community"],
+          "description": "Informational label for listing and filtering. A host derives the level of a package from its signer and never grants one from this member."
+        },
+        "commercial": {
+          "type": "object",
+          "description": "Present on a commercial partner plugin: its price text by language, where to buy it, trial days and license kind. Hosts show a Commercial badge with these; payment and license checks are the vendor's and the plugin's.",
+          "properties": {
+            "pricing": { "type": "object", "additionalProperties": { "type": "string" } },
+            "purchase_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "trial_days": { "type": "integer", "minimum": 0 },
+            "license": { "type": "string" }
+          }
+        },
+        "revoked_signers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keyId" },
+          "uniqueItems": true,
+          "description": "Ids of the signing keys the author withdrew. A package signed by one is unsigned, and the releases they signed are yanked."
+        },
+        "provides": {
+          "type": "object",
+          "description": "What the plugin provides, read from the plugin.json of its newest release, so a host can find the plugin before installing it. Optional: a host that does not read it ignores it.",
+          "additionalProperties": true,
+          "properties": {
+            "dns01": { "$ref": "#/$defs/providesDns01" }
+          }
+        },
+        "releases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/release" }
+        }
+      }
+    },
+    "providesDns01": {
+      "type": "object",
+      "description": "The dns01 providers of the plugin: the ones of its newest release, and the ones a newer release dropped while the newest stable release still has them. A host takes a provider as available in the release it would install when since <= that version < removed_in, comparing by semantic versioning.",
+      "required": ["since", "providers"],
+      "additionalProperties": false,
+      "properties": {
+        "since": {
+          "$ref": "plugin.schema.json#/properties/version",
+          "description": "The plugin version since which the plugin provides dns01, the earliest since of its providers. A provider without a since of its own is provided since this version."
+        },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/providedDns01" }
+        }
+      }
+    },
+    "providedDns01": {
+      "type": "object",
+      "description": "One dns01 provider of a plugin.",
+      "required": ["code", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "$ref": "plugin.schema.json#/$defs/dns01Provider/properties/code" },
+        "name": { "$ref": "plugin.schema.json#/$defs/dns01Provider/properties/name" },
+        "since": {
+          "$ref": "plugin.schema.json#/properties/version",
+          "description": "The plugin version since which the plugin provides it, the first release of the newest unbroken run of releases that declare it. Left out when it is the since of dns01."
+        },
+        "removed_in": {
+          "$ref": "plugin.schema.json#/properties/version",
+          "description": "The first release after that run, which no longer declares it. Left out while the newest release declares it."
+        }
+      }
+    },
+    "download": {
+      "type": "object",
+      "required": ["url"],
+      "additionalProperties": true,
+      "description": "One package of a release.",
+      "properties": {
+        "url": { "$ref": "#/$defs/url" },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 of the package file, a check of the download."
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "required": ["version", "api_version"],
+      "additionalProperties": true,
+      "anyOf": [
+        {
+          "required": ["download_url"],
+          "properties": { "download_url": { "minLength": 1 } }
+        },
+        {
+          "required": ["downloads"],
+          "properties": { "downloads": { "minProperties": 1 } }
+        }
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Semantic version, equal to the version of every package of the release."
+        },
+        "released_at": { "type": "string", "format": "date-time" },
+        "api_version": { "type": "integer", "minimum": 1 },
+        "min_nginx_ui_version": { "type": "string" },
+        "platforms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/platformKey" },
+          "description": "Summary of where the release installs: every key of downloads plus the platforms the portable package serves. Empty or absent means the portable package runs everywhere."
+        },
+        "downloads": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/platformKey" },
+          "additionalProperties": { "$ref": "#/$defs/download" },
+          "description": "Per-platform packages, keyed by <goos>-<goarch> or any. A host picks downloads[platform], then downloads[any], then the portable package."
+        },
+        "download_url": {
+          "type": "string",
+          "description": "The portable package, the fallback for every platform downloads does not name. May be empty when downloads is present."
+        },
+        "sha256": {
+          "description": "SHA-256 of the portable package.",
+          "anyOf": [{ "$ref": "#/$defs/sha256" }, { "const": "" }]
+        },
+        "release_notes_url": { "$ref": "#/$defs/url" },
+        "notes": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "What changed in the release, in Markdown. A host sanitizes the rendered HTML and links to release_notes_url for the full notes."
+        },
+        "yanked": { "type": "boolean" },
+        "signer": {
+          "$ref": "#/$defs/keyId",
+          "description": "Id of the key that signed plugin.sums in the packages of the release."
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["stable", "beta", "dev"],
+          "description": "The release channel, from the most to the least stable. Without it the host infers the channel from the version: no prerelease part is stable, a prerelease starting with alpha, dev, nightly, snapshot, canary or preview is dev, any other prerelease is beta."
+        },
+        "manifest": {
+          "$ref": "#/$defs/manifestSnapshot",
+          "description": "Snapshot of the release manifest, whose server.executables names every platform the release ships."
+        }
+      }
+    },
+    "manifestSnapshot": {
+      "type": "object",
+      "description": "The members of the plugin.json of a release a host reads before the install: what the plugin is, where it runs, what it asks for and what it needs. The capability blocks (dns01, http, notify and the others), webapp, content, events, cron and settings_schema stay in the package, whose plugin.json is the one the host installs, so the catalog does not repeat what changes from release to release. A host ignores any other member.",
+      "required": ["id", "name", "version", "api_version"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "$ref": "plugin.schema.json#/properties/id" },
+        "name": { "$ref": "plugin.schema.json#/properties/name" },
+        "version": { "$ref": "plugin.schema.json#/properties/version" },
+        "description": { "$ref": "plugin.schema.json#/properties/description" },
+        "i18n": { "$ref": "plugin.schema.json#/properties/i18n" },
+        "homepage_url": { "$ref": "plugin.schema.json#/properties/homepage_url" },
+        "api_version": { "$ref": "plugin.schema.json#/properties/api_version" },
+        "min_nginx_ui_version": { "$ref": "plugin.schema.json#/properties/min_nginx_ui_version" },
+        "server": { "$ref": "plugin.schema.json#/properties/server" },
+        "capabilities": { "$ref": "plugin.schema.json#/properties/capabilities" },
+        "permissions": { "$ref": "plugin.schema.json#/properties/permissions" },
+        "requires": { "$ref": "plugin.schema.json#/properties/requires" },
+        "requires_capabilities": { "$ref": "plugin.schema.json#/properties/requires_capabilities" },
+        "conflicts": { "$ref": "plugin.schema.json#/properties/conflicts" },
+        "network_hosts": { "$ref": "plugin.schema.json#/properties/network_hosts" },
+        "permission_reasons": { "$ref": "plugin.schema.json#/properties/permission_reasons" },
+        "screenshots": {
+          "$ref": "plugin.schema.json#/properties/screenshots",
+          "description": "The screenshots of the release, which the catalog lists the entry with. A host reads the screenshots of the entry instead."
+        }
+      }
+    }
+  }
+}
