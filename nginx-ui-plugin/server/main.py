@@ -117,7 +117,7 @@ def nginx_info() -> dict[str, Any]:
         return result
 
     output = completed.stdout + "\n" + completed.stderr
-    version_match = re.search(r"nginx version:\\s*nginx/([^\\s]+)", output)
+    version_match = re.search(r"nginx version:\s*nginx/([^\s]+)", output)
     args_match = re.search(r"configure arguments:(.*)", output)
     result.update(
         {
