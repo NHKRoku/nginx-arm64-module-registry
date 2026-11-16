@@ -1,36 +1,48 @@
-# NHKRoku NGINX Module Manager — NGINX UI plugin
+# NGINX Module Manager — NGINX UI plugin
 
-This directory is the separate NGINX UI plugin project hosted in this monorepo. It is **not** the dynamic-module registry and is not yet a publishable Marketplace package.
+A read-only NGINX UI plugin for browsing the NHKRoku ARM64 dynamic-module registry and checking basic compatibility against the local NGINX host.
 
-## Responsibilities
+## Current scope (0.1.0)
 
-The plugin will consume the module registry at:
+- Reads the fixed public registry URL: `https://raw.githubusercontent.com/NHKRoku/nginx-arm64-module-registry/main/index.json`.
+- Validates the registry schema version and basic structure before using it.
+- Shows the local OS, architecture and NGINX version.
+- Compares registry binary metadata against the local OS release, architecture and NGINX version.
+- Provides a static NGINX UI page at Plugins → NGINX Module Manager → NGINX Modules.
+- Exposes read-only JSON endpoints below the plugin's authenticated HTTP route: `/api/registry`, `/api/nginx` and `/api/compatibility`.
 
-`https://raw.githubusercontent.com/NHKRoku/nginx-arm64-module-registry/main/index.json`
+## Explicitly not supported
 
-Planned first milestones:
+This is a discovery and preliminary compatibility tool only. It does not download or install module binaries, write NGINX configuration, run `nginx -t`, or reload NGINX. The registry currently does not record the complete NGINX configure arguments/build ID, so matching metadata is not proof of ABI compatibility.
 
-1. Read and validate the registry; browse modules and release artifacts.
-2. Inspect the local NGINX binary version and build information.
-3. Compare the local NGINX environment with each artifact's OS, architecture, NGINX version and build flavor.
-4. Download artifacts only after explicit user action and verify SHA-256 before presenting an install action.
-5. Later: stage module files, create backups, write a reviewed `load_module` snippet, run `nginx -t`, and require explicit confirmation before reload.
+## Build
 
-## Security boundary
+The first target is Linux ARM64 with Python 3:
 
-NGINX UI plugins execute with the operating-system privileges of the NGINX UI process. This plugin must therefore use a narrow allowlist of filesystem and process operations. Never execute shell text assembled from registry data. Never auto-install, overwrite a module, edit the active configuration, or reload NGINX in the initial release.
+```sh
+./build.sh
+```
 
-The first release is intended to be read-only (discovery and compatibility inspection). Installation support is a later milestone with backups, path restrictions, dry-run output, config testing, and explicit confirmation.
+This creates `dist/linux-arm64/nginx-module-manager`, the executable path declared in `plugin.json`. The launcher is a Python script and uses only the standard library.
 
-## Catalog separation
+## Validate with NGINX UI
 
-The module registry remains at the repository root `index.json` and keeps its current schema. An NGINX UI Marketplace catalog is a different document with a localized `name` object and a `plugins` array. Do not point NGINX UI's Marketplace source at the module index. A plugin catalog entry and signed plugin package will be added only after this plugin passes the NGINX UI linter and conformance tests.
+Use an NGINX UI 3.x binary with plugin tooling:
 
-## Development target
+```sh
+./build.sh
+nginx-ui plugin lint .
+nginx-ui plugin conformance .
+nginx-ui plugin pack . io.github.nhkroku.nginx-module-manager-0.1.0-linux-arm64.tar.gz
+```
 
-- NGINX UI: 3.x plugin system
-- Plugin ID target: `io.github.nhkroku.nginx-module-manager`
-- Protocol: NGINX UI JSON-RPC 2.0 over newline-delimited stdio
-- Package: NGINX UI `.tar.gz` plugin package, signed before distribution
+Do not publish a Marketplace catalog entry until lint and conformance pass, a package is built, its SHA-256 is calculated, and the package is signed. Unsigned packages require developer mode for local testing.
 
-See https://nginxui.com/plugin/overview and https://nginxui.com/plugin/quick-start.
+## Security
+
+- The registry URL is fixed in code; registry-supplied URLs are never executed.
+- Registry input is treated as data and size-limited.
+- The plugin exposes GET-only HTTP endpoints.
+- The only local process invocation is the fixed NGINX executable with the single `-V` argument; no shell is used.
+- No file writes, module installation, configuration changes or reloads are implemented.
+- The plugin process runs with NGINX UI's OS privileges. Install only after reviewing the source.
