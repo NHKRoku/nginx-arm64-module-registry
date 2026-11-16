@@ -1,10 +1,37 @@
 {
   "name": "NGINX Debian ARM64 Module Registry",
-  "description": "Dynamic NGINX modules for Debian ARM64",
+  "description": "Community NGINX dynamic modules",
   "schema_version": 1,
+  "generated_at": "2026-11-16T05:43:04.253526+00:00",
   "architecture": "arm64",
   "os_family": [
     "debian"
   ],
-  "modules": []
+  "modules": [
+    {
+      "id": "headers-more",
+      "name": "Headers More",
+      "description": "Set and clear HTTP request and response headers.",
+      "version": "v0.37",
+      "type": "dynamic",
+      "repository": "https://github.com/openresty/headers-more-nginx-module",
+      "source": {
+        "filename": "headers-more-source-v0.37.tar.gz",
+        "download_url": "https://github.com/NHKRoku/nginx-arm64-module-registry/releases/download/v1.0.0/headers-more-source-v0.37.tar.gz",
+        "sha256": "54e77788328d1dee43d821dbc13747fbb80ba6e1c60847466130319ae96c20ee"
+      },
+      "binaries": [
+        {
+          "os": "debian",
+          "debian_release": "13",
+          "architecture": "arm64",
+          "nginx_version": "1.28.0",
+          "build_flavor": "nginx.org-upstream-source",
+          "filename": "headers-more-debian13-arm64-nginx-1.28.0.zip",
+          "download_url": "https://github.com/NHKRoku/nginx-arm64-module-registry/releases/download/v1.0.0/headers-more-debian13-arm64-nginx-1.28.0.zip",
+          "sha256": "5e322e329cdfcb6bf1f1934d39d132d7a0409cb5617fd8feed145b98a8a5abf3"
+        }
+      ]
+    }
+  ]
 }
