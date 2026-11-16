@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "platforms": [
+    {
+      "id": "debian13-arm64-nginx-org-source",
+      "os": "debian",
+      "debian_release": "13",
+      "architecture": "arm64",
+      "build_flavor": "nginx.org-upstream-source",
+      "nginx_versions": ["1.28.0"]
+    }
+  ]
+}
